@@ -3,8 +3,8 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 #include "env_librados.h"
 
-#include <mutex>
 #include <cstdlib>
+#include <mutex>
 
 #include "util/random.h"
 
@@ -15,18 +15,21 @@ namespace ROCKSDB_NAMESPACE {
 #include <cstdio>
 #include <sys/syscall.h>
 #include <unistd.h>
-#define LOG_DEBUG(...)  do{\
-    printf("[%ld:%s:%i:%s]", syscall(SYS_gettid), __FILE__, __LINE__, __FUNCTION__);\
-    printf(__VA_ARGS__);\
-  }while(0)
+#define LOG_DEBUG(...)                                                         \
+  do {                                                                         \
+    printf("[%ld:%s:%i:%s]", syscall(SYS_gettid), __FILE__, __LINE__,          \
+           __FUNCTION__);                                                      \
+    printf(__VA_ARGS__);                                                       \
+  } while (0)
 #else
 #define LOG_DEBUG(...)
 #endif
 
 /* GLOBAL CONSTANT */
-const char *default_db_name     = "default_envlibrados_db";
-const char *default_pool_name   = "default_envlibrados_pool";
-const char *default_config_path = "CEPH_CONFIG_PATH";           // the env variable name of ceph configure file
+const char *default_db_name = "default_envlibrados_db";
+const char *default_pool_name = "default_envlibrados_pool";
+const char *default_config_path =
+    "CEPH_CONFIG_PATH"; // the env variable name of ceph configure file
 // maximum dir/file that can store in the fs
 const int MAX_ITEMS_IN_FS = 1 << 30;
 // root dir tag
@@ -40,8 +43,7 @@ const std::string DIR_ID_VALUE = "<DIR>";
  * @param r [description]
  * @return [description]
  */
-Status err_to_status(int r)
-{
+Status err_to_status(int r) {
   switch (r) {
   case 0:
     return Status::OK();
@@ -64,10 +66,9 @@ Status err_to_status(int r)
 /**
  * @brief split file path into dir path and file name
  * @details
- * Because rocksdb only need a 2-level structure (dir/file), all input path will be shortened to dir/file format
- *  For example:
- *    b/c => dir '/b', file 'c'
- *    /a/b/c => dir '/b', file 'c'
+ * Because rocksdb only need a 2-level structure (dir/file), all input path will
+ * be shortened to dir/file format For example: b/c => dir '/b', file 'c' /a/b/c
+ * => dir '/b', file 'c'
  *
  * @param fn [description]
  * @param dir [description]
@@ -76,12 +77,14 @@ Status err_to_status(int r)
 void split(const std::string &fn, std::string *dir, std::string *file) {
   LOG_DEBUG("[IN]%s\n", fn.c_str());
   int pos = fn.size() - 1;
-  while ('/' == fn[pos]) --pos;
+  while ('/' == fn[pos])
+    --pos;
   size_t fstart = fn.rfind('/', pos);
   *file = fn.substr(fstart + 1, pos - fstart);
 
   pos = fstart;
-  while (pos >= 0 && '/' == fn[pos]) --pos;
+  while (pos >= 0 && '/' == fn[pos])
+    --pos;
 
   if (pos < 0) {
     *dir = "/";
@@ -96,13 +99,15 @@ void split(const std::string &fn, std::string *dir, std::string *file) {
 
 // A file abstraction for reading sequentially through a file
 class LibradosSequentialFile : public SequentialFile {
-  librados::IoCtx * _io_ctx;
+  librados::IoCtx *_io_ctx;
   std::string _fid;
   std::string _hint;
   int _offset;
+
 public:
-  LibradosSequentialFile(librados::IoCtx * io_ctx, std::string fid, std::string hint):
-    _io_ctx(io_ctx), _fid(fid), _hint(hint), _offset(0) {}
+  LibradosSequentialFile(librados::IoCtx *io_ctx, std::string fid,
+                         std::string hint)
+      : _io_ctx(io_ctx), _fid(fid), _hint(hint), _offset(0) {}
 
   ~LibradosSequentialFile() {}
 
@@ -123,7 +128,7 @@ public:
    * @param scratch [description]
    * @return [description]
    */
-  Status Read(size_t n, Slice* result, char* scratch) {
+  Status Read(size_t n, Slice *result, char *scratch) {
     LOG_DEBUG("[IN]%i\n", (int)n);
     librados::bufferlist buffer;
     Status s;
@@ -140,7 +145,8 @@ public:
         s = Status::OK();
       }
     }
-    LOG_DEBUG("[OUT]%s, %i, %s\n", s.ToString().c_str(), (int)r, buffer.c_str());
+    LOG_DEBUG("[OUT]%s, %i, %s\n", s.ToString().c_str(), (int)r,
+              buffer.c_str());
     return s;
   }
 
@@ -181,12 +187,14 @@ public:
 
 // A file abstraction for randomly reading the contents of a file.
 class LibradosRandomAccessFile : public RandomAccessFile {
-  librados::IoCtx * _io_ctx;
+  librados::IoCtx *_io_ctx;
   std::string _fid;
   std::string _hint;
+
 public:
-  LibradosRandomAccessFile(librados::IoCtx * io_ctx, std::string fid, std::string hint):
-    _io_ctx(io_ctx), _fid(fid), _hint(hint) {}
+  LibradosRandomAccessFile(librados::IoCtx *io_ctx, std::string fid,
+                           std::string hint)
+      : _io_ctx(io_ctx), _fid(fid), _hint(hint) {}
 
   ~LibradosRandomAccessFile() {}
 
@@ -200,8 +208,7 @@ public:
    * @param scratch [description]
    * @return [description]
    */
-  Status Read(uint64_t offset, size_t n, Slice* result,
-              char* scratch) const {
+  Status Read(uint64_t offset, size_t n, Slice *result, char *scratch) const {
     LOG_DEBUG("[IN]%i\n", (int)n);
     librados::bufferlist buffer;
     Status s;
@@ -217,20 +224,22 @@ public:
         s = Status::OK();
       }
     }
-    LOG_DEBUG("[OUT]%s, %i, %s\n", s.ToString().c_str(), (int)r, buffer.c_str());
+    LOG_DEBUG("[OUT]%s, %i, %s\n", s.ToString().c_str(), (int)r,
+              buffer.c_str());
     return s;
   }
 
   /**
    * @brief [brief description]
-   * @details Get unique id for each file and guarantee this id is different for each file
+   * @details Get unique id for each file and guarantee this id is different for
+   * each file
    *
    * @param id [description]
    * @param max_size max size of id, it shoud be larger than 16
    *
    * @return [description]
    */
-  size_t GetUniqueId(char* id, size_t max_size) const {
+  size_t GetUniqueId(char *id, size_t max_size) const {
     // All fid has the same db_id prefix, so we need to ignore db_id prefix
     size_t s = std::min(max_size, _fid.size());
     strncpy(id, _fid.c_str() + (_fid.size() - s), s);
@@ -238,7 +247,7 @@ public:
     return s;
   };
 
-  //enum AccessPattern { NORMAL, RANDOM, SEQUENTIAL, WILLNEED, DONTNEED };
+  // enum AccessPattern { NORMAL, RANDOM, SEQUENTIAL, WILLNEED, DONTNEED };
   void Hint(AccessPattern /*pattern*/) { /* Do nothing */
   }
 
@@ -256,20 +265,19 @@ public:
   }
 };
 
-
 // A file abstraction for sequential writing.  The implementation
 // must provide buffering since callers may append small fragments
 // at a time to the file.
 class LibradosWritableFile : public WritableFile {
-  librados::IoCtx * _io_ctx;
+  librados::IoCtx *_io_ctx;
   std::string _fid;
   std::string _hint;
-  const EnvLibrados * const _env;
+  const EnvLibrados *const _env;
 
-  std::mutex _mutex;                 // used to protect modification of all following variables
-  librados::bufferlist _buffer;      // write buffer
-  uint64_t _buffer_size;             // write buffer size
-  uint64_t _file_size;               // this file size doesn't include buffer size
+  std::mutex _mutex; // used to protect modification of all following variables
+  librados::bufferlist _buffer; // write buffer
+  uint64_t _buffer_size;        // write buffer size
+  uint64_t _file_size;          // this file size doesn't include buffer size
 
   /**
    * @brief assuming caller holds lock
@@ -291,18 +299,12 @@ class LibradosWritableFile : public WritableFile {
     return r;
   }
 
- public:
-  LibradosWritableFile(librados::IoCtx* io_ctx, std::string fid,
-                       std::string hint, const EnvLibrados* const env,
-                       const EnvOptions& options)
-      : WritableFile(options),
-        _io_ctx(io_ctx),
-        _fid(fid),
-        _hint(hint),
-        _env(env),
-        _buffer(),
-        _buffer_size(0),
-        _file_size(0) {
+public:
+  LibradosWritableFile(librados::IoCtx *io_ctx, std::string fid,
+                       std::string hint, const EnvLibrados *const env,
+                       const EnvOptions &options)
+      : WritableFile(options), _io_ctx(io_ctx), _fid(fid), _hint(hint),
+        _env(env), _buffer(), _buffer_size(0), _file_size(0) {
     int ret = _io_ctx->stat(_fid, &_file_size, nullptr);
 
     // if file not exist
@@ -326,7 +328,7 @@ class LibradosWritableFile : public WritableFile {
    * @param data [description]
    * @return [description]
    */
-  Status Append(const Slice& data) override {
+  Status Append(const Slice &data) override {
     // append buffer
     LOG_DEBUG("[IN] %i | %s\n", (int)data.size(), data.data());
     int r = 0;
@@ -349,7 +351,7 @@ class LibradosWritableFile : public WritableFile {
    * @details [long description]
    * @return [description]
    */
-  Status PositionedAppend(const Slice& /* data */,
+  Status PositionedAppend(const Slice & /* data */,
                           uint64_t /* offset */) override {
     return Status::NotSupported();
   }
@@ -362,7 +364,8 @@ class LibradosWritableFile : public WritableFile {
    * @return [description]
    */
   Status Truncate(uint64_t size) override {
-    LOG_DEBUG("[IN]%lld|%lld|%lld\n", (long long)size, (long long)_file_size, (long long)_buffer_size);
+    LOG_DEBUG("[IN]%lld|%lld|%lld\n", (long long)size, (long long)_file_size,
+              (long long)_buffer_size);
     int r = 0;
 
     std::lock_guard<std::mutex> lock(_mutex);
@@ -394,7 +397,8 @@ class LibradosWritableFile : public WritableFile {
    * @return [description]
    */
   Status Close() override {
-    LOG_DEBUG("%s | %lld | %lld\n", _hint.c_str(), (long long)_buffer_size, (long long)_file_size);
+    LOG_DEBUG("%s | %lld | %lld\n", _hint.c_str(), (long long)_buffer_size,
+              (long long)_file_size);
     return Sync();
   }
 
@@ -405,7 +409,8 @@ class LibradosWritableFile : public WritableFile {
    * @return [description]
    */
   Status Flush() override {
-    librados::AioCompletion *write_completion = librados::Rados::aio_create_completion();
+    librados::AioCompletion *write_completion =
+        librados::Rados::aio_create_completion();
     int r = 0;
 
     std::lock_guard<std::mutex> lock(_mutex);
@@ -427,7 +432,7 @@ class LibradosWritableFile : public WritableFile {
    * @details initiate an aio write and wait for result
    * @return [description]
    */
-  Status Sync() override {  // sync data
+  Status Sync() override { // sync data
     int r = 0;
 
     std::lock_guard<std::mutex> lock(_mutex);
@@ -441,12 +446,14 @@ class LibradosWritableFile : public WritableFile {
   /**
    * @brief [brief description]
    * @details [long description]
-   * @return true if Sync() and Fsync() are safe to call concurrently with Append()and Flush().
+   * @return true if Sync() and Fsync() are safe to call concurrently with
+   * Append()and Flush().
    */
   bool IsSyncThreadSafe() const override { return true; }
 
   /**
-   * @brief Indicates the upper layers if the current WritableFile implementation uses direct IO.
+   * @brief Indicates the upper layers if the current WritableFile
+   * implementation uses direct IO.
    * @details [long description]
    * @return [description]
    */
@@ -476,7 +483,7 @@ class LibradosWritableFile : public WritableFile {
    *
    * @return [description]
    */
-  size_t GetUniqueId(char* id, size_t max_size) const override {
+  size_t GetUniqueId(char *id, size_t max_size) const override {
     // All fid has the same db_id prefix, so we need to ignore db_id prefix
     size_t s = std::min(max_size, _fid.size());
     strncpy(id, _fid.c_str() + (_fid.size() - s), s);
@@ -510,7 +517,7 @@ class LibradosWritableFile : public WritableFile {
     return Sync();
   }
 
- protected:
+protected:
   /**
    * @brief noop
    * @details [long description]
@@ -525,14 +532,13 @@ class LibradosWritableFile : public WritableFile {
   }
 };
 
-
 // Directory object represents collection of files and implements
 // filesystem operations that can be executed on directories.
 class LibradosDirectory : public Directory {
   std::string _fid;
 
- public:
-  explicit LibradosDirectory(librados::IoCtx* /*io_ctx*/, std::string fid)
+public:
+  explicit LibradosDirectory(librados::IoCtx * /*io_ctx*/, std::string fid)
       : _fid(fid) {}
 
   // Fsync directory. Can be called concurrently from multiple threads.
@@ -542,33 +548,25 @@ class LibradosDirectory : public Directory {
 // Identifies a locked file.
 // This is exclusive lock and can't nested lock by same thread
 class LibradosFileLock : public FileLock {
-  librados::IoCtx * _io_ctx;
+  librados::IoCtx *_io_ctx;
   const std::string _obj_name;
   const std::string _lock_name;
   const std::string _cookie;
 
- public:
-  LibradosFileLock(
-    librados::IoCtx * io_ctx,
-    const std::string obj_name):
-    _io_ctx(io_ctx),
-    _obj_name(obj_name),
-    _lock_name("lock_name"),
-    _cookie("cookie") {
+public:
+  LibradosFileLock(librados::IoCtx *io_ctx, const std::string obj_name)
+      : _io_ctx(io_ctx), _obj_name(obj_name), _lock_name("lock_name"),
+        _cookie("cookie") {
 
-    // TODO: the lock will never expire. It may cause problem if the process crash or abnormally exit.
-    while (!_io_ctx->lock_exclusive(
-             _obj_name,
-             _lock_name,
-             _cookie,
-             "description", nullptr, 0));
+    // TODO: the lock will never expire. It may cause problem if the process
+    // crash or abnormally exit.
+    while (!_io_ctx->lock_exclusive(_obj_name, _lock_name, _cookie,
+                                    "description", nullptr, 0))
+      ;
   }
 
-  ~LibradosFileLock() {
-    _io_ctx->unlock(_obj_name, _lock_name, _cookie);
-  }
+  ~LibradosFileLock() { _io_ctx->unlock(_obj_name, _lock_name, _cookie); }
 };
-
 
 // --------------------
 // --- EnvLibrados ----
@@ -580,18 +578,11 @@ class LibradosFileLock : public FileLock {
  * @param db_name unique database name
  * @param config_path the configure file path for rados
  */
-EnvLibrados::EnvLibrados(const std::string& db_name,
-                         const std::string& config_path,
-                         const std::string& db_pool)
-  : EnvLibrados("client.admin",
-                "ceph",
-                0,
-                db_name,
-                config_path,
-                db_pool,
-                "/wal",
-                db_pool,
-                1 << 20) {}
+EnvLibrados::EnvLibrados(const std::string &db_name,
+                         const std::string &config_path,
+                         const std::string &db_pool)
+    : EnvLibrados("client.admin", "ceph", 0, db_name, config_path, db_pool,
+                  "/wal", db_pool, 1 << 20) {}
 
 /**
  * @brief EnvLibrados ctor
@@ -606,29 +597,22 @@ EnvLibrados::EnvLibrados(const std::string& db_name,
  * @param wal_pool the pool for WAL data
  * @param write_buffer_size WritableFile buffer max size
  */
-EnvLibrados::EnvLibrados(const std::string& client_name,
-                         const std::string& cluster_name,
-                         const uint64_t flags,
-                         const std::string& db_name,
-                         const std::string& config_path,
-                         const std::string& db_pool,
-                         const std::string& wal_dir,
-                         const std::string& wal_pool,
+EnvLibrados::EnvLibrados(const std::string &client_name,
+                         const std::string &cluster_name, const uint64_t flags,
+                         const std::string &db_name,
+                         const std::string &config_path,
+                         const std::string &db_pool, const std::string &wal_dir,
+                         const std::string &wal_pool,
                          const uint64_t write_buffer_size)
-  : EnvWrapper(Env::Default()),
-    _client_name(client_name),
-    _cluster_name(cluster_name),
-    _flags(flags),
-    _db_name(db_name),
-    _config_path(config_path),
-    _db_pool_name(db_pool),
-    _wal_dir(wal_dir),
-    _wal_pool_name(wal_pool),
-    _write_buffer_size(write_buffer_size) {
+    : EnvWrapper(Env::Default()), _client_name(client_name),
+      _cluster_name(cluster_name), _flags(flags), _db_name(db_name),
+      _config_path(config_path), _db_pool_name(db_pool), _wal_dir(wal_dir),
+      _wal_pool_name(wal_pool), _write_buffer_size(write_buffer_size) {
   int ret = 0;
 
   // 1. create a Rados object and initialize it
-  ret = _rados.init2(_client_name.c_str(), _cluster_name.c_str(), _flags); // just use the client.admin keyring
+  ret = _rados.init2(_client_name.c_str(), _cluster_name.c_str(),
+                     _flags); // just use the client.admin keyring
   if (ret < 0) { // let's handle any error that might have come back
     std::cerr << "couldn't initialize rados! error " << ret << std::endl;
     ret = EXIT_FAILURE;
@@ -639,8 +623,8 @@ EnvLibrados::EnvLibrados(const std::string& client_name,
   ret = _rados.conf_read_file(_config_path.c_str());
   if (ret < 0) {
     // This could fail if the config file is malformed, but it'd be hard.
-    std::cerr << "failed to parse config file " << _config_path
-              << "! error" << ret << std::endl;
+    std::cerr << "failed to parse config file " << _config_path << "! error"
+              << ret << std::endl;
     ret = EXIT_FAILURE;
     goto out;
   }
@@ -655,7 +639,7 @@ EnvLibrados::EnvLibrados(const std::string& client_name,
 
   // 4. create db_pool if not exist
   ret = _rados.pool_create(_db_pool_name.c_str());
-  if (ret < 0 && ret != -EEXIST && ret !=  -EPERM) {
+  if (ret < 0 && ret != -EEXIST && ret != -EPERM) {
     std::cerr << "couldn't create pool! error " << ret << std::endl;
     goto out;
   }
@@ -670,7 +654,7 @@ EnvLibrados::EnvLibrados(const std::string& client_name,
 
   // 6. create wal_pool if not exist
   ret = _rados.pool_create(_wal_pool_name.c_str());
-  if (ret < 0 && ret != -EEXIST && ret !=  -EPERM) {
+  if (ret < 0 && ret != -EEXIST && ret != -EPERM) {
     std::cerr << "couldn't create pool! error " << ret << std::endl;
     goto out;
   }
@@ -715,9 +699,7 @@ std::string EnvLibrados::_CreateFid() {
  *  Status::OK()
  *  Status::NotFound()
  */
-Status EnvLibrados::_GetFid(
-  const std::string &fname,
-  std::string& fid) {
+Status EnvLibrados::_GetFid(const std::string &fname, std::string &fid) {
   std::set<std::string> keys;
   std::map<std::string, librados::bufferlist> kvs;
   keys.insert(fname);
@@ -743,8 +725,8 @@ Status EnvLibrados::_GetFid(
  *
  * @return [description]
  */
-Status EnvLibrados::_RenameFid(const std::string& old_fname,
-                               const std::string& new_fname) {
+Status EnvLibrados::_RenameFid(const std::string &old_fname,
+                               const std::string &new_fname) {
   std::string fid;
   Status s = _GetFid(old_fname, fid);
 
@@ -774,9 +756,7 @@ Status EnvLibrados::_RenameFid(const std::string& old_fname,
  *
  * @return [description]
  */
-Status EnvLibrados::_AddFid(
-  const std::string& fname,
-  const std::string& fid) {
+Status EnvLibrados::_AddFid(const std::string &fname, const std::string &fid) {
   std::map<std::string, librados::bufferlist> kvs;
   librados::bufferlist value;
   value.append(fid);
@@ -797,15 +777,12 @@ Status EnvLibrados::_AddFid(
  *
  * @return [description]
  */
-Status EnvLibrados::_GetSubFnames(
-  const std::string& dir,
-  std::vector<std::string> * result
-) {
+Status EnvLibrados::_GetSubFnames(const std::string &dir,
+                                  std::vector<std::string> *result) {
   std::string start_after(dir);
   std::string filter_prefix(dir);
   std::map<std::string, librados::bufferlist> kvs;
-  _db_pool_ioctx.omap_get_vals(_db_name,
-                               start_after, filter_prefix,
+  _db_pool_ioctx.omap_get_vals(_db_name, start_after, filter_prefix,
                                MAX_ITEMS_IN_FS, &kvs);
 
   result->clear();
@@ -822,8 +799,7 @@ Status EnvLibrados::_GetSubFnames(
  * @param fname [description]
  * @return [description]
  */
-Status EnvLibrados::_DelFid(
-  const std::string& fname) {
+Status EnvLibrados::_DelFid(const std::string &fname) {
   std::set<std::string> keys;
   keys.insert(fname);
   int r = _db_pool_ioctx.omap_rm_keys(_db_name, keys);
@@ -838,10 +814,11 @@ Status EnvLibrados::_DelFid(
  * @return [description]
  *
  */
-librados::IoCtx* EnvLibrados::_GetIoctx(const std::string& fpath) {
-  auto is_prefix = [](const std::string & s1, const std::string & s2) {
+librados::IoCtx *EnvLibrados::_GetIoctx(const std::string &fpath) {
+  auto is_prefix = [](const std::string &s1, const std::string &s2) {
     auto it1 = s1.begin(), it2 = s2.begin();
-    while (it1 != s1.end() && it2 != s2.end() && *it1 == *it2) ++it1, ++it2;
+    while (it1 != s1.end() && it2 != s2.end() && *it1 == *it2)
+      ++it1, ++it2;
     return it1 == s1.end();
   };
 
@@ -864,9 +841,9 @@ librados::IoCtx* EnvLibrados::_GetIoctx(const std::string& fpath) {
  * @param options [description]
  * @return [description]
  */
-Status EnvLibrados::NewSequentialFile(const std::string& fname,
-                                      std::unique_ptr<SequentialFile>* result,
-                                      const EnvOptions& /*options*/) {
+Status EnvLibrados::NewSequentialFile(const std::string &fname,
+                                      std::unique_ptr<SequentialFile> *result,
+                                      const EnvOptions & /*options*/) {
   LOG_DEBUG("[IN]%s\n", fname.c_str());
   std::string dir, file, fid;
   split(fname, &dir, &file);
@@ -876,7 +853,8 @@ Status EnvLibrados::NewSequentialFile(const std::string& fname,
     s = _GetFid(dir, fid);
 
     if (!s.ok() || fid != DIR_ID_VALUE) {
-      if (fid != DIR_ID_VALUE) s = Status::IOError();
+      if (fid != DIR_ID_VALUE)
+        s = Status::IOError();
       break;
     }
 
@@ -905,9 +883,10 @@ Status EnvLibrados::NewSequentialFile(const std::string& fname,
  * @param options [description]
  * @return [description]
  */
-Status EnvLibrados::NewRandomAccessFile(
-    const std::string& fname, std::unique_ptr<RandomAccessFile>* result,
-    const EnvOptions& /*options*/) {
+Status
+EnvLibrados::NewRandomAccessFile(const std::string &fname,
+                                 std::unique_ptr<RandomAccessFile> *result,
+                                 const EnvOptions & /*options*/) {
   LOG_DEBUG("[IN]%s\n", fname.c_str());
   std::string dir, file, fid;
   split(fname, &dir, &file);
@@ -946,11 +925,9 @@ Status EnvLibrados::NewRandomAccessFile(
  * @param options [description]
  * @return [description]
  */
-Status EnvLibrados::NewWritableFile(
-  const std::string& fname,
-  std::unique_ptr<WritableFile>* result,
-  const EnvOptions& options)
-{
+Status EnvLibrados::NewWritableFile(const std::string &fname,
+                                    std::unique_ptr<WritableFile> *result,
+                                    const EnvOptions &options) {
   LOG_DEBUG("[IN]%s\n", fname.c_str());
   std::string dir, file, fid;
   split(fname, &dir, &file);
@@ -999,12 +976,10 @@ Status EnvLibrados::NewWritableFile(
  * @param options [description]
  * @return [description]
  */
-Status EnvLibrados::ReuseWritableFile(
-  const std::string& new_fname,
-  const std::string& old_fname,
-  std::unique_ptr<WritableFile>* result,
-  const EnvOptions& options)
-{
+Status EnvLibrados::ReuseWritableFile(const std::string &new_fname,
+                                      const std::string &old_fname,
+                                      std::unique_ptr<WritableFile> *result,
+                                      const EnvOptions &options) {
   LOG_DEBUG("[IN]%s => %s\n", old_fname.c_str(), new_fname.c_str());
   std::string src_fid, tmp_fid, src_dir, src_file, dst_dir, dst_file;
   split(old_fname, &src_dir, &src_file);
@@ -1014,8 +989,7 @@ Status EnvLibrados::ReuseWritableFile(
   std::string dst_fpath = dst_dir + "/" + dst_file;
   Status r = Status::OK();
   do {
-    r = _RenameFid(src_fpath,
-                   dst_fpath);
+    r = _RenameFid(src_fpath, dst_fpath);
     if (!r.ok()) {
       break;
     }
@@ -1037,10 +1011,8 @@ Status EnvLibrados::ReuseWritableFile(
  *
  * @return [description]
  */
-Status EnvLibrados::NewDirectory(
-  const std::string& name,
-  std::unique_ptr<Directory>* result)
-{
+Status EnvLibrados::NewDirectory(const std::string &name,
+                                 std::unique_ptr<Directory> *result) {
   LOG_DEBUG("[IN]%s\n", name.c_str());
   std::string fid, dir, file;
   /* just want to get dir name */
@@ -1057,7 +1029,8 @@ Status EnvLibrados::NewDirectory(
 
     if (Status::NotFound() == s) {
       s = _AddFid(dir, DIR_ID_VALUE);
-      if (!s.ok()) break;
+      if (!s.ok())
+        break;
     } else if (!s.ok()) {
       break;
     }
@@ -1077,8 +1050,7 @@ Status EnvLibrados::NewDirectory(
  * @param fname [description]
  * @return [description]
  */
-Status EnvLibrados::FileExists(const std::string& fname)
-{
+Status EnvLibrados::FileExists(const std::string &fname) {
   LOG_DEBUG("[IN]%s\n", fname.c_str());
   std::string fid, dir, file;
   split(fname, &dir, &file);
@@ -1101,10 +1073,8 @@ Status EnvLibrados::FileExists(const std::string& fname)
  *
  * @return [description]
  */
-Status EnvLibrados::GetChildren(
-  const std::string& dir_in,
-  std::vector<std::string>* result)
-{
+Status EnvLibrados::GetChildren(const std::string &dir_in,
+                                std::vector<std::string> *result) {
   LOG_DEBUG("[IN]%s\n", dir_in.c_str());
   std::string fid, dir, file;
   split(dir_in + "/temp", &dir, &file);
@@ -1135,8 +1105,7 @@ Status EnvLibrados::GetChildren(
  * @param fname [description]
  * @return [description]
  */
-Status EnvLibrados::DeleteFile(const std::string& fname)
-{
+Status EnvLibrados::DeleteFile(const std::string &fname) {
   LOG_DEBUG("[IN]%s\n", fname.c_str());
   std::string fid, dir, file;
   split(fname, &dir, &file);
@@ -1158,8 +1127,7 @@ Status EnvLibrados::DeleteFile(const std::string& fname)
  * @param dirname [description]
  * @return [description]
  */
-Status EnvLibrados::CreateDir(const std::string& dirname)
-{
+Status EnvLibrados::CreateDir(const std::string &dirname) {
   LOG_DEBUG("[IN]%s\n", dirname.c_str());
   std::string fid, dir, file;
   split(dirname + "/temp", &dir, &file);
@@ -1186,8 +1154,7 @@ Status EnvLibrados::CreateDir(const std::string& dirname)
  * @param dirname [description]
  * @return [description]
  */
-Status EnvLibrados::CreateDirIfMissing(const std::string& dirname)
-{
+Status EnvLibrados::CreateDirIfMissing(const std::string &dirname) {
   LOG_DEBUG("[IN]%s\n", dirname.c_str());
   std::string fid, dir, file;
   split(dirname + "/temp", &dir, &file);
@@ -1213,8 +1180,7 @@ Status EnvLibrados::CreateDirIfMissing(const std::string& dirname)
  * @param dirname [description]
  * @return [description]
  */
-Status EnvLibrados::DeleteDir(const std::string& dirname)
-{
+Status EnvLibrados::DeleteDir(const std::string &dirname) {
   LOG_DEBUG("[IN]%s\n", dirname.c_str());
   std::string fid, dir, file;
   split(dirname + "/temp", &dir, &file);
@@ -1248,10 +1214,7 @@ Status EnvLibrados::DeleteDir(const std::string& dirname)
  *
  * @return [description]
  */
-Status EnvLibrados::GetFileSize(
-  const std::string& fname,
-  uint64_t* file_size)
-{
+Status EnvLibrados::GetFileSize(const std::string &fname, uint64_t *file_size) {
   LOG_DEBUG("[IN]%s\n", fname.c_str());
   std::string fid, dir, file;
   split(fname, &dir, &file);
@@ -1293,9 +1256,8 @@ Status EnvLibrados::GetFileSize(
  *
  * @return [description]
  */
-Status EnvLibrados::GetFileModificationTime(const std::string& fname,
-    uint64_t* file_mtime)
-{
+Status EnvLibrados::GetFileModificationTime(const std::string &fname,
+                                            uint64_t *file_mtime) {
   LOG_DEBUG("[IN]%s\n", fname.c_str());
   std::string fid, dir, file;
   split(fname, &dir, &file);
@@ -1336,17 +1298,14 @@ Status EnvLibrados::GetFileModificationTime(const std::string& fname,
  *
  * @return [description]
  */
-Status EnvLibrados::RenameFile(
-  const std::string& src,
-  const std::string& target_in)
-{
+Status EnvLibrados::RenameFile(const std::string &src,
+                               const std::string &target_in) {
   LOG_DEBUG("[IN]%s => %s\n", src.c_str(), target_in.c_str());
   std::string src_fid, tmp_fid, src_dir, src_file, dst_dir, dst_file;
   split(src, &src_dir, &src_file);
   split(target_in, &dst_dir, &dst_file);
 
-  auto s = _RenameFid(src_dir + "/" + src_file,
-                      dst_dir + "/" + dst_file);
+  auto s = _RenameFid(src_dir + "/" + src_file, dst_dir + "/" + dst_file);
   LOG_DEBUG("[OUT]%s\n", s.ToString().c_str());
   return s;
 }
@@ -1360,10 +1319,8 @@ Status EnvLibrados::RenameFile(
  *
  * @return [description]
  */
-Status EnvLibrados::LinkFile(
-  const std::string& src,
-  const std::string& target_in)
-{
+Status EnvLibrados::LinkFile(const std::string &src,
+                             const std::string &target_in) {
   (void)src;
   (void)target_in;
   LOG_DEBUG("[IO]%s => %s\n", src.c_str(), target_in.c_str());
@@ -1378,8 +1335,10 @@ Status EnvLibrados::LinkFile(
  * from opening up the database at the same time. From RocksDB source code,
  * the invokes of LockFile are at following locations:
  *
- *  ./db/db_impl.cc:1159:    s = env_->LockFile(LockFileName(dbname_), &db_lock_);    // DBImpl::Recover
- *  ./db/db_impl.cc:5839:  Status result = env->LockFile(lockname, &lock);            // Status DestroyDB
+ *  ./db/db_impl.cc:1159:    s = env_->LockFile(LockFileName(dbname_),
+ * &db_lock_);    // DBImpl::Recover
+ *  ./db/db_impl.cc:5839:  Status result = env->LockFile(lockname, &lock); //
+ * Status DestroyDB
  *
  * When db recovery and db destroy, RocksDB will call LockFile
  *
@@ -1388,10 +1347,7 @@ Status EnvLibrados::LinkFile(
  *
  * @return [description]
  */
-Status EnvLibrados::LockFile(
-  const std::string& fname,
-  FileLock** lock)
-{
+Status EnvLibrados::LockFile(const std::string &fname, FileLock **lock) {
   LOG_DEBUG("[IN]%s\n", fname.c_str());
   std::string fid, dir, file;
   split(fname, &dir, &file);
@@ -1401,8 +1357,7 @@ Status EnvLibrados::LockFile(
     std::string fpath = dir + "/" + file;
     s = _GetFid(fpath, fid);
 
-    if (Status::OK() != s &&
-        Status::NotFound() != s) {
+    if (Status::OK() != s && Status::NotFound() != s) {
       break;
     } else if (Status::NotFound() == s) {
       s = _AddFid(fpath, _CreateFid());
@@ -1428,15 +1383,13 @@ Status EnvLibrados::LockFile(
  * @param lock [description]
  * @return [description]
  */
-Status EnvLibrados::UnlockFile(FileLock* lock)
-{
+Status EnvLibrados::UnlockFile(FileLock *lock) {
   LOG_DEBUG("[IO]%p\n", lock);
   if (nullptr != lock) {
     delete lock;
   }
   return Status::OK();
 }
-
 
 /**
  * @brief not support
@@ -1447,8 +1400,8 @@ Status EnvLibrados::UnlockFile(FileLock* lock)
  *
  * @return [description]
  */
-Status EnvLibrados::GetAbsolutePath(const std::string& db_path,
-                                    std::string* /*output_path*/) {
+Status EnvLibrados::GetAbsolutePath(const std::string &db_path,
+                                    std::string * /*output_path*/) {
   (void)db_path;
   LOG_DEBUG("[IO]%s\n", db_path.c_str());
   return Status::NotSupported();
@@ -1459,11 +1412,10 @@ Status EnvLibrados::GetAbsolutePath(const std::string& db_path,
  * @details [long description]
  * @return [description]
  */
-EnvLibrados* EnvLibrados::Default() {
-  static EnvLibrados default_env(default_db_name,
-                                 std::getenv(default_config_path),
-                                 default_pool_name);
+EnvLibrados *EnvLibrados::Default() {
+  static EnvLibrados default_env(
+      default_db_name, std::getenv(default_config_path), default_pool_name);
   return &default_env;
 }
 
-}  // namespace ROCKSDB_NAMESPACE
+} // namespace ROCKSDB_NAMESPACE

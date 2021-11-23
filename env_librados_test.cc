@@ -35,25 +35,22 @@ class Timer {
   using high_resolution_clock = std::chrono::high_resolution_clock;
   using milliseconds = std::chrono::milliseconds;
 
- public:
-  explicit Timer(bool run = false)
-  {
+public:
+  explicit Timer(bool run = false) {
     if (run)
       Reset();
   }
-  void Reset()
-  {
-    _start = high_resolution_clock::now();
-  }
-  milliseconds Elapsed() const
-  {
-    return std::chrono::duration_cast<milliseconds>(high_resolution_clock::now() - _start);
+  void Reset() { _start = high_resolution_clock::now(); }
+  milliseconds Elapsed() const {
+    return std::chrono::duration_cast<milliseconds>(
+        high_resolution_clock::now() - _start);
   }
   template <typename T, typename Traits>
-  friend std::basic_ostream<T, Traits>& operator<<(std::basic_ostream<T, Traits>& out, const Timer& timer)
-  {
+  friend std::basic_ostream<T, Traits> &
+  operator<<(std::basic_ostream<T, Traits> &out, const Timer &timer) {
     return out << timer.Elapsed().count();
   }
+
 private:
   high_resolution_clock::time_point _start;
 };
@@ -68,12 +65,10 @@ public:
   const char *keyring = "admin";
   const char *config = "../ceph/src/ceph.conf";
 
-  EnvLibrados* env_;
+  EnvLibrados *env_;
   const EnvOptions soptions_;
 
-  EnvLibradosTest()
-    : env_(new EnvLibrados(db_name, config, db_pool)) {
-  }
+  EnvLibradosTest() : env_(new EnvLibrados(db_name, config, db_pool)) {}
   ~EnvLibradosTest() {
     delete env_;
     librados::Rados rados;
@@ -89,8 +84,8 @@ public:
       ret = rados.conf_read_file(config);
       if (ret < 0) {
         // This could fail if the config file is malformed, but it'd be hard.
-        std::cerr << "failed to parse config file " << config
-                  << "! error" << ret << std::endl;
+        std::cerr << "failed to parse config file " << config << "! error"
+                  << ret << std::endl;
         ret = EXIT_FAILURE;
         break;
       }
@@ -113,7 +108,8 @@ public:
       int delete_ret = rados.pool_delete(db_pool.c_str());
       if (delete_ret < 0) {
         // be careful not to
-        std::cerr << "We failed to delete our test pool!" << db_pool << delete_ret << std::endl;
+        std::cerr << "We failed to delete our test pool!" << db_pool
+                  << delete_ret << std::endl;
         ret = EXIT_FAILURE;
       }
     } while (0);
@@ -149,11 +145,9 @@ TEST_F(EnvLibradosTest, Basics) {
   ASSERT_OK(writable_file->Append("abc"));
   writable_file.reset();
 
-
   // Check for expected size.
   ASSERT_OK(env_->GetFileSize("/dir/f", &file_size));
   ASSERT_EQ(3U, file_size);
-
 
   // Check that renaming works.
   ASSERT_TRUE(!env_->RenameFile("/dir/non_existent", "/dir/g").ok());
@@ -167,10 +161,11 @@ TEST_F(EnvLibradosTest, Basics) {
   std::unique_ptr<SequentialFile> seq_file;
   std::unique_ptr<RandomAccessFile> rand_file;
   ASSERT_TRUE(
-    !env_->NewSequentialFile("/dir/non_existent", &seq_file, soptions_).ok());
+      !env_->NewSequentialFile("/dir/non_existent", &seq_file, soptions_).ok());
   ASSERT_TRUE(!seq_file);
-  ASSERT_TRUE(!env_->NewRandomAccessFile("/dir/non_existent", &rand_file,
-                                         soptions_).ok());
+  ASSERT_TRUE(
+      !env_->NewRandomAccessFile("/dir/non_existent", &rand_file, soptions_)
+           .ok());
   ASSERT_TRUE(!rand_file);
 
   // Check that deleting works.
@@ -198,24 +193,24 @@ TEST_F(EnvLibradosTest, ReadWrite) {
 
   // Read sequentially.
   ASSERT_OK(env_->NewSequentialFile("/dir/f", &seq_file, soptions_));
-  ASSERT_OK(seq_file->Read(5, &result, scratch));  // Read "hello".
+  ASSERT_OK(seq_file->Read(5, &result, scratch)); // Read "hello".
   ASSERT_EQ(0, result.compare("hello"));
   ASSERT_OK(seq_file->Skip(1));
-  ASSERT_OK(seq_file->Read(1000, &result, scratch));  // Read "world".
+  ASSERT_OK(seq_file->Read(1000, &result, scratch)); // Read "world".
   ASSERT_EQ(0, result.compare("world"));
-  ASSERT_OK(seq_file->Read(1000, &result, scratch));  // Try reading past EOF.
+  ASSERT_OK(seq_file->Read(1000, &result, scratch)); // Try reading past EOF.
   ASSERT_EQ(0U, result.size());
-  ASSERT_OK(seq_file->Skip(100));  // Try to skip past end of file.
+  ASSERT_OK(seq_file->Skip(100)); // Try to skip past end of file.
   ASSERT_OK(seq_file->Read(1000, &result, scratch));
   ASSERT_EQ(0U, result.size());
 
   // Random reads.
   ASSERT_OK(env_->NewRandomAccessFile("/dir/f", &rand_file, soptions_));
-  ASSERT_OK(rand_file->Read(6, 5, &result, scratch));  // Read "world".
+  ASSERT_OK(rand_file->Read(6, 5, &result, scratch)); // Read "world".
   ASSERT_EQ(0, result.compare("world"));
-  ASSERT_OK(rand_file->Read(0, 5, &result, scratch));  // Read "hello".
+  ASSERT_OK(rand_file->Read(0, 5, &result, scratch)); // Read "hello".
   ASSERT_EQ(0, result.compare("hello"));
-  ASSERT_OK(rand_file->Read(10, 100, &result, scratch));  // Read "d".
+  ASSERT_OK(rand_file->Read(10, 100, &result, scratch)); // Read "d".
   ASSERT_EQ(0, result.compare("d"));
 
   // Too high offset.
@@ -223,7 +218,7 @@ TEST_F(EnvLibradosTest, ReadWrite) {
 }
 
 TEST_F(EnvLibradosTest, Locks) {
-  FileLock* lock = nullptr;
+  FileLock *lock = nullptr;
   std::unique_ptr<WritableFile> writable_file;
 
   ASSERT_OK(env_->CreateDir("/dir"));
@@ -256,7 +251,7 @@ TEST_F(EnvLibradosTest, Misc) {
 
 TEST_F(EnvLibradosTest, LargeWrite) {
   const size_t kWriteSize = 300 * 1024;
-  char* scratch = new char[kWriteSize * 2];
+  char *scratch = new char[kWriteSize * 2];
 
   std::string write_data;
   for (size_t i = 0; i < kWriteSize; ++i) {
@@ -273,7 +268,7 @@ TEST_F(EnvLibradosTest, LargeWrite) {
   std::unique_ptr<SequentialFile> seq_file;
   Slice result;
   ASSERT_OK(env_->NewSequentialFile("/dir/g", &seq_file, soptions_));
-  ASSERT_OK(seq_file->Read(3, &result, scratch));  // Read "foo".
+  ASSERT_OK(seq_file->Read(3, &result, scratch)); // Read "foo".
   ASSERT_EQ(0, result.compare("foo"));
 
   size_t read = 0;
@@ -289,7 +284,7 @@ TEST_F(EnvLibradosTest, LargeWrite) {
 
 TEST_F(EnvLibradosTest, FrequentlySmallWrite) {
   const size_t kWriteSize = 1 << 10;
-  char* scratch = new char[kWriteSize * 2];
+  char *scratch = new char[kWriteSize * 2];
 
   std::string write_data;
   for (size_t i = 0; i < kWriteSize; ++i) {
@@ -309,7 +304,7 @@ TEST_F(EnvLibradosTest, FrequentlySmallWrite) {
   std::unique_ptr<SequentialFile> seq_file;
   Slice result;
   ASSERT_OK(env_->NewSequentialFile("/dir/g", &seq_file, soptions_));
-  ASSERT_OK(seq_file->Read(3, &result, scratch));  // Read "foo".
+  ASSERT_OK(seq_file->Read(3, &result, scratch)); // Read "foo".
   ASSERT_EQ(0, result.compare("foo"));
 
   size_t read = 0;
@@ -343,7 +338,7 @@ TEST_F(EnvLibradosTest, Truncate) {
 
 TEST_F(EnvLibradosTest, DBBasics) {
   std::string kDBPath = "/tmp/DBBasics";
-  DB* db;
+  DB *db;
   Options options;
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options.IncreaseParallelism();
@@ -391,7 +386,7 @@ TEST_F(EnvLibradosTest, DBLoadKeysInRandomOrder) {
             use default env
   ***********************************/
   std::string kDBPath1 = "/tmp/DBLoadKeysInRandomOrder1";
-  DB* db1;
+  DB *db1;
   Options options1;
   // Optimize Rocksdb. This is the easiest way to get RocksDB to perform well
   options1.IncreaseParallelism();
@@ -422,7 +417,7 @@ TEST_F(EnvLibradosTest, DBLoadKeysInRandomOrder) {
             use librados env
   ***********************************/
   std::string kDBPath2 = "/tmp/DBLoadKeysInRandomOrder2";
-  DB* db2;
+  DB *db2;
   Options options2;
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options2.IncreaseParallelism();
@@ -452,12 +447,13 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInRandomOrder) {
   int max_loop = 1 << 6;
   int bulk_size = 1 << 15;
   Timer timer(false);
-  std::cout << "Test size : loop(" << max_loop << "); bulk_size(" << bulk_size << ")" << std::endl;
+  std::cout << "Test size : loop(" << max_loop << "); bulk_size(" << bulk_size
+            << ")" << std::endl;
   /**********************************
             use default env
   ***********************************/
   std::string kDBPath1 = "/tmp/DBBulkLoadKeysInRandomOrder1";
-  DB* db1;
+  DB *db1;
   Options options1;
   // Optimize Rocksdb. This is the easiest way to get RocksDB to perform well
   options1.IncreaseParallelism();
@@ -491,7 +487,7 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInRandomOrder) {
             use librados env
   ***********************************/
   std::string kDBPath2 = "/tmp/DBBulkLoadKeysInRandomOrder2";
-  DB* db2;
+  DB *db2;
   Options options2;
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options2.IncreaseParallelism();
@@ -524,12 +520,13 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInSequentialOrder) {
   int max_loop = 1 << 6;
   int bulk_size = 1 << 15;
   Timer timer(false);
-  std::cout << "Test size : loop(" << max_loop << "); bulk_size(" << bulk_size << ")" << std::endl;
+  std::cout << "Test size : loop(" << max_loop << "); bulk_size(" << bulk_size
+            << ")" << std::endl;
   /**********************************
             use default env
   ***********************************/
   std::string kDBPath1 = "/tmp/DBBulkLoadKeysInSequentialOrder1";
-  DB* db1;
+  DB *db1;
   Options options1;
   // Optimize Rocksdb. This is the easiest way to get RocksDB to perform well
   options1.IncreaseParallelism();
@@ -549,10 +546,7 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInSequentialOrder) {
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
-      snprintf(key,
-               20,
-               "%019lld",
-               (long long)(i * bulk_size + j));
+      snprintf(key, 20, "%019lld", (long long)(i * bulk_size + j));
       snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
@@ -566,7 +560,7 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInSequentialOrder) {
             use librados env
   ***********************************/
   std::string kDBPath2 = "/tmp/DBBulkLoadKeysInSequentialOrder2";
-  DB* db2;
+  DB *db2;
   Options options2;
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options2.IncreaseParallelism();
@@ -600,12 +594,13 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
   int bulk_size = 1 << 10;
   int read_loop = 1 << 20;
   Timer timer(false);
-  std::cout << "Test size : keys_num(" << max_loop << ", " << bulk_size << "); read_loop(" << read_loop << ")" << std::endl;
+  std::cout << "Test size : keys_num(" << max_loop << ", " << bulk_size
+            << "); read_loop(" << read_loop << ")" << std::endl;
   /**********************************
             use default env
   ***********************************/
   std::string kDBPath1 = "/tmp/DBRandomRead1";
-  DB* db1;
+  DB *db1;
   Options options1;
   // Optimize Rocksdb. This is the easiest way to get RocksDB to perform well
   options1.IncreaseParallelism();
@@ -624,10 +619,7 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
-      snprintf(key,
-               20,
-               "%019lld",
-               (long long)(i * bulk_size + j));
+      snprintf(key, 20, "%019lld", (long long)(i * bulk_size + j));
       snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
@@ -640,10 +632,7 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
     base1 = distribution(generator) % max_loop;
     offset1 = distribution(generator) % bulk_size;
     std::string value1;
-    snprintf(key,
-             20,
-             "%019lld",
-             (long long)(base1 * bulk_size + offset1));
+    snprintf(key, 20, "%019lld", (long long)(base1 * bulk_size + offset1));
     s1 = db1->Get(ReadOptions(), key, &value1);
     assert(s1.ok());
   }
@@ -654,7 +643,7 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
             use librados env
   ***********************************/
   std::string kDBPath2 = "/tmp/DBRandomRead2";
-  DB* db2;
+  DB *db2;
   Options options2;
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options2.IncreaseParallelism();
@@ -670,10 +659,7 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
-      snprintf(key,
-               20,
-               "%019lld",
-               (long long)(i * bulk_size + j));
+      snprintf(key, 20, "%019lld", (long long)(i * bulk_size + j));
       snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
@@ -687,10 +673,7 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
     base2 = distribution(generator) % max_loop;
     offset2 = distribution(generator) % bulk_size;
     std::string value2;
-    snprintf(key,
-             20,
-             "%019lld",
-             (long long)(base2 * bulk_size + offset2));
+    snprintf(key, 20, "%019lld", (long long)(base2 * bulk_size + offset2));
     s2 = db2->Get(ReadOptions(), key, &value2);
     if (!s2.ok()) {
       std::cout << s2.ToString() << std::endl;
@@ -715,11 +698,12 @@ public:
   const char *keyring = "admin";
   const char *config = "../ceph/src/ceph.conf";
 
-  EnvLibrados* env_;
+  EnvLibrados *env_;
   const EnvOptions soptions_;
 
   EnvLibradosMutipoolTest() {
-    env_ = new EnvLibrados(client_name, cluster_name, flags, db_name, config, db_pool, wal_dir, wal_pool, write_buffer_size);
+    env_ = new EnvLibrados(client_name, cluster_name, flags, db_name, config,
+                           db_pool, wal_dir, wal_pool, write_buffer_size);
   }
   ~EnvLibradosMutipoolTest() {
     delete env_;
@@ -736,8 +720,8 @@ public:
       ret = rados.conf_read_file(config);
       if (ret < 0) {
         // This could fail if the config file is malformed, but it'd be hard.
-        std::cerr << "failed to parse config file " << config
-                  << "! error" << ret << std::endl;
+        std::cerr << "failed to parse config file " << config << "! error"
+                  << ret << std::endl;
         ret = EXIT_FAILURE;
         break;
       }
@@ -760,13 +744,15 @@ public:
       int delete_ret = rados.pool_delete(db_pool.c_str());
       if (delete_ret < 0) {
         // be careful not to
-        std::cerr << "We failed to delete our test pool!" << db_pool << delete_ret << std::endl;
+        std::cerr << "We failed to delete our test pool!" << db_pool
+                  << delete_ret << std::endl;
         ret = EXIT_FAILURE;
       }
       delete_ret = rados.pool_delete(wal_pool.c_str());
       if (delete_ret < 0) {
         // be careful not to
-        std::cerr << "We failed to delete our test pool!" << wal_pool << delete_ret << std::endl;
+        std::cerr << "We failed to delete our test pool!" << wal_pool
+                  << delete_ret << std::endl;
         ret = EXIT_FAILURE;
       }
     } while (0);
@@ -777,7 +763,8 @@ TEST_F(EnvLibradosMutipoolTest, Basics) {
   uint64_t file_size;
   std::unique_ptr<WritableFile> writable_file;
   std::vector<std::string> children;
-  std::vector<std::string> v = {"/tmp/dir1", "/tmp/dir2", "/tmp/dir3", "/tmp/dir4", "dir"};
+  std::vector<std::string> v = {"/tmp/dir1", "/tmp/dir2", "/tmp/dir3",
+                                "/tmp/dir4", "dir"};
 
   for (size_t i = 0; i < v.size(); ++i) {
     std::string dir = v[i];
@@ -809,14 +796,13 @@ TEST_F(EnvLibradosMutipoolTest, Basics) {
     ASSERT_OK(writable_file->Append("abc"));
     writable_file.reset();
 
-
     // Check for expected size.
     ASSERT_OK(env_->GetFileSize(dir_f.c_str(), &file_size));
     ASSERT_EQ(3U, file_size);
 
-
     // Check that renaming works.
-    ASSERT_TRUE(!env_->RenameFile(dir_non_existent.c_str(), dir_g.c_str()).ok());
+    ASSERT_TRUE(
+        !env_->RenameFile(dir_non_existent.c_str(), dir_g.c_str()).ok());
     ASSERT_OK(env_->RenameFile(dir_f.c_str(), dir_g.c_str()));
     ASSERT_EQ(Status::NotFound(), env_->FileExists(dir_f.c_str()));
     ASSERT_OK(env_->FileExists(dir_g.c_str()));
@@ -827,10 +813,12 @@ TEST_F(EnvLibradosMutipoolTest, Basics) {
     std::unique_ptr<SequentialFile> seq_file;
     std::unique_ptr<RandomAccessFile> rand_file;
     ASSERT_TRUE(
-      !env_->NewSequentialFile(dir_non_existent.c_str(), &seq_file, soptions_).ok());
+        !env_->NewSequentialFile(dir_non_existent.c_str(), &seq_file, soptions_)
+             .ok());
     ASSERT_TRUE(!seq_file);
     ASSERT_TRUE(!env_->NewRandomAccessFile(dir_non_existent.c_str(), &rand_file,
-                                           soptions_).ok());
+                                           soptions_)
+                     .ok());
     ASSERT_TRUE(!rand_file);
 
     // Check that deleting works.
@@ -846,7 +834,7 @@ TEST_F(EnvLibradosMutipoolTest, Basics) {
 TEST_F(EnvLibradosMutipoolTest, DBBasics) {
   std::string kDBPath = "/tmp/DBBasics";
   std::string walPath = "/tmp/wal";
-  DB* db;
+  DB *db;
   Options options;
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options.IncreaseParallelism();
@@ -891,13 +879,14 @@ TEST_F(EnvLibradosMutipoolTest, DBBulkLoadKeysInRandomOrder) {
   int max_loop = 1 << 6;
   int bulk_size = 1 << 15;
   Timer timer(false);
-  std::cout << "Test size : loop(" << max_loop << "); bulk_size(" << bulk_size << ")" << std::endl;
+  std::cout << "Test size : loop(" << max_loop << "); bulk_size(" << bulk_size
+            << ")" << std::endl;
   /**********************************
             use default env
   ***********************************/
   std::string kDBPath1 = "/tmp/DBBulkLoadKeysInRandomOrder1";
   std::string walPath = "/tmp/wal";
-  DB* db1;
+  DB *db1;
   Options options1;
   // Optimize Rocksdb. This is the easiest way to get RocksDB to perform well
   options1.IncreaseParallelism();
@@ -931,7 +920,7 @@ TEST_F(EnvLibradosMutipoolTest, DBBulkLoadKeysInRandomOrder) {
             use librados env
   ***********************************/
   std::string kDBPath2 = "/tmp/DBBulkLoadKeysInRandomOrder2";
-  DB* db2;
+  DB *db2;
   Options options2;
   // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
   options2.IncreaseParallelism();
@@ -970,7 +959,7 @@ TEST_F(EnvLibradosMutipoolTest, DBTransactionDB) {
   TransactionDBOptions txn_db_options;
   options.create_if_missing = true;
   options.env = env_;
-  TransactionDB* txn_db;
+  TransactionDB *txn_db;
 
   Status s = TransactionDB::Open(options, txn_db_options, kDBPath, &txn_db);
   assert(s.ok());
@@ -987,7 +976,7 @@ TEST_F(EnvLibradosMutipoolTest, DBTransactionDB) {
   ////////////////////////////////////////////////////////
 
   // Start a transaction
-  Transaction* txn = txn_db->BeginTransaction(write_options);
+  Transaction *txn = txn_db->BeginTransaction(write_options);
   assert(txn);
 
   // Read a key in this transaction
@@ -1022,7 +1011,7 @@ TEST_F(EnvLibradosMutipoolTest, DBTransactionDB) {
   txn_options.set_snapshot = true;
   txn = txn_db->BeginTransaction(write_options, txn_options);
 
-  const Snapshot* snapshot = txn->GetSnapshot();
+  const Snapshot *snapshot = txn->GetSnapshot();
 
   // Write a key OUTSIDE of transaction
   s = txn_db->Put(write_options, "abc", "xyz");
@@ -1090,9 +1079,9 @@ TEST_F(EnvLibradosMutipoolTest, DBTransactionDB) {
   DestroyDB(kDBPath, options);
 }
 
-}  // namespace ROCKSDB_NAMESPACE
+} // namespace ROCKSDB_NAMESPACE
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   if (getenv("CIRCLECI")) {
     fprintf(stderr,
@@ -1105,9 +1094,9 @@ int main(int argc, char** argv) {
 #else
 #include <stdio.h>
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   fprintf(stderr, "SKIPPED as EnvLibrados is not supported in ROCKSDB_LITE\n");
   return 0;
 }
 
-#endif  // !ROCKSDB_LITE
+#endif // !ROCKSDB_LITE
