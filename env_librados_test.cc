@@ -6,18 +6,30 @@
 
 #ifndef ROCKSDB_LITE
 
-#include "rocksdb/utilities/env_librados.h"
-#include <rados/librados.hpp>
-#include "env/mock_env.h"
-#include "test_util/testharness.h"
-
-#include "rocksdb/db.h"
-#include "rocksdb/slice.h"
-#include "rocksdb/options.h"
-#include "util/random.h"
 #include <chrono>
 #include <ostream>
-#include "rocksdb/utilities/transaction_db.h"
+#include <random>
+
+#include <gtest/gtest.h>
+
+#include <rocksdb/db.h>
+#include <rocksdb/options.h>
+#include <rocksdb/slice.h>
+#include <rocksdb/utilities/transaction_db.h>
+
+#include "env_librados.h"
+
+static ::testing::AssertionResult
+AssertStatus(const char *s_expr, const ROCKSDB_NAMESPACE::Status &s) {
+  if (s.ok()) {
+    return ::testing::AssertionSuccess();
+  } else {
+    return ::testing::AssertionFailure() << s_expr << std::endl << s.ToString();
+  }
+}
+
+#define ASSERT_OK(s) ASSERT_PRED_FORMAT1(AssertStatus, s)
+#define ASSERT_NOK(s) ASSERT_FALSE((s).ok())
 
 class Timer {
   using high_resolution_clock = std::chrono::high_resolution_clock;
@@ -391,18 +403,14 @@ TEST_F(EnvLibradosTest, DBLoadKeysInRandomOrder) {
   Status s1 = DB::Open(options1, kDBPath1, &db1);
   assert(s1.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r1(time(nullptr));
+  std::default_random_engine generator;
+  std::uniform_int_distribution<uint64_t> distribution(
+      0, std::numeric_limits<uint64_t>::max());
 
   timer.Reset();
   for (int i = 0; i < max_loop; ++i) {
-    snprintf(key,
-             20,
-             "%16lx",
-             (unsigned long)r1.Uniform(std::numeric_limits<uint64_t>::max()));
-    snprintf(value,
-             20,
-             "%16lx",
-             (unsigned long)r1.Uniform(std::numeric_limits<uint64_t>::max()));
+    snprintf(key, 20, "%16lx", (unsigned long)distribution(generator));
+    snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
     // Put key-value
     s1 = db1->Put(WriteOptions(), key, value);
     assert(s1.ok());
@@ -427,18 +435,10 @@ TEST_F(EnvLibradosTest, DBLoadKeysInRandomOrder) {
   Status s2 = DB::Open(options2, kDBPath2, &db2);
   assert(s2.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r2(time(nullptr));
-
   timer.Reset();
   for (int i = 0; i < max_loop; ++i) {
-    snprintf(key,
-             20,
-             "%16lx",
-             (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
-    snprintf(value,
-             20,
-             "%16lx",
-             (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
+    snprintf(key, 20, "%16lx", (unsigned long)distribution(generator));
+    snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
     // Put key-value
     s2 = db2->Put(WriteOptions(), key, value);
     assert(s2.ok());
@@ -469,20 +469,16 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInRandomOrder) {
   Status s1 = DB::Open(options1, kDBPath1, &db1);
   assert(s1.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r1(time(nullptr));
+  std::default_random_engine generator;
+  std::uniform_int_distribution<uint64_t> distribution(
+      0, std::numeric_limits<uint64_t>::max());
 
   timer.Reset();
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
-      snprintf(key,
-               20,
-               "%16lx",
-               (unsigned long)r1.Uniform(std::numeric_limits<uint64_t>::max()));
-      snprintf(value,
-               20,
-               "%16lx",
-               (unsigned long)r1.Uniform(std::numeric_limits<uint64_t>::max()));
+      snprintf(key, 20, "%16lx", (unsigned long)distribution(generator));
+      snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
     s1 = db1->Write(WriteOptions(), &batch);
@@ -508,20 +504,12 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInRandomOrder) {
   Status s2 = DB::Open(options2, kDBPath2, &db2);
   assert(s2.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r2(time(nullptr));
-
   timer.Reset();
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
-      snprintf(key,
-               20,
-               "%16lx",
-               (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
-      snprintf(value,
-               20,
-               "%16lx",
-               (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
+      snprintf(key, 20, "%16lx", (unsigned long)distribution(generator));
+      snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
     s2 = db2->Write(WriteOptions(), &batch);
@@ -553,7 +541,9 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInSequentialOrder) {
   Status s1 = DB::Open(options1, kDBPath1, &db1);
   assert(s1.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r1(time(nullptr));
+  std::default_random_engine generator;
+  std::uniform_int_distribution<uint64_t> distribution(
+      0, std::numeric_limits<uint64_t>::max());
 
   timer.Reset();
   for (int i = 0; i < max_loop; ++i) {
@@ -563,10 +553,7 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInSequentialOrder) {
                20,
                "%019lld",
                (long long)(i * bulk_size + j));
-      snprintf(value,
-               20,
-               "%16lx",
-               (unsigned long)r1.Uniform(std::numeric_limits<uint64_t>::max()));
+      snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
     s1 = db1->Write(WriteOptions(), &batch);
@@ -592,20 +579,12 @@ TEST_F(EnvLibradosTest, DBBulkLoadKeysInSequentialOrder) {
   Status s2 = DB::Open(options2, kDBPath2, &db2);
   assert(s2.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r2(time(nullptr));
-
   timer.Reset();
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
-      snprintf(key,
-               20,
-               "%16lx",
-               (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
-      snprintf(value,
-               20,
-               "%16lx",
-               (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
+      snprintf(key, 20, "%16lx", (unsigned long)distribution(generator));
+      snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
     s2 = db2->Write(WriteOptions(), &batch);
@@ -638,7 +617,9 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
   Status s1 = DB::Open(options1, kDBPath1, &db1);
   assert(s1.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r1(time(nullptr));
+  std::default_random_engine generator;
+  std::uniform_int_distribution<uint64_t> distribution(
+      0, std::numeric_limits<uint64_t>::max());
 
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
@@ -647,10 +628,7 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
                20,
                "%019lld",
                (long long)(i * bulk_size + j));
-      snprintf(value,
-               20,
-               "%16lx",
-               (unsigned long)r1.Uniform(std::numeric_limits<uint64_t>::max()));
+      snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
     s1 = db1->Write(WriteOptions(), &batch);
@@ -659,8 +637,8 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
   timer.Reset();
   int base1 = 0, offset1 = 0;
   for (int i = 0; i < read_loop; ++i) {
-    base1 = r1.Uniform(max_loop);
-    offset1 = r1.Uniform(bulk_size);
+    base1 = distribution(generator) % max_loop;
+    offset1 = distribution(generator) % bulk_size;
     std::string value1;
     snprintf(key,
              20,
@@ -689,8 +667,6 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
   Status s2 = DB::Open(options2, kDBPath2, &db2);
   assert(s2.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r2(time(nullptr));
-
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
@@ -698,10 +674,7 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
                20,
                "%019lld",
                (long long)(i * bulk_size + j));
-      snprintf(value,
-               20,
-               "%16lx",
-               (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
+      snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
     s2 = db2->Write(WriteOptions(), &batch);
@@ -711,8 +684,8 @@ TEST_F(EnvLibradosTest, DBRandomRead) {
   timer.Reset();
   int base2 = 0, offset2 = 0;
   for (int i = 0; i < read_loop; ++i) {
-    base2 = r2.Uniform(max_loop);
-    offset2 = r2.Uniform(bulk_size);
+    base2 = distribution(generator) % max_loop;
+    offset2 = distribution(generator) % bulk_size;
     std::string value2;
     snprintf(key,
              20,
@@ -936,20 +909,16 @@ TEST_F(EnvLibradosMutipoolTest, DBBulkLoadKeysInRandomOrder) {
   Status s1 = DB::Open(options1, kDBPath1, &db1);
   assert(s1.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r1(time(nullptr));
+  std::default_random_engine generator;
+  std::uniform_int_distribution<uint64_t> distribution(
+      0, std::numeric_limits<uint64_t>::max());
 
   timer.Reset();
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
-      snprintf(key,
-               20,
-               "%16lx",
-               (unsigned long)r1.Uniform(std::numeric_limits<uint64_t>::max()));
-      snprintf(value,
-               20,
-               "%16lx",
-               (unsigned long)r1.Uniform(std::numeric_limits<uint64_t>::max()));
+      snprintf(key, 20, "%16lx", (unsigned long)distribution(generator));
+      snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
     s1 = db1->Write(WriteOptions(), &batch);
@@ -979,20 +948,12 @@ TEST_F(EnvLibradosMutipoolTest, DBBulkLoadKeysInRandomOrder) {
   }
   assert(s2.ok());
 
-  ROCKSDB_NAMESPACE::Random64 r2(time(nullptr));
-
   timer.Reset();
   for (int i = 0; i < max_loop; ++i) {
     WriteBatch batch;
     for (int j = 0; j < bulk_size; ++j) {
-      snprintf(key,
-               20,
-               "%16lx",
-               (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
-      snprintf(value,
-               20,
-               "%16lx",
-               (unsigned long)r2.Uniform(std::numeric_limits<uint64_t>::max()));
+      snprintf(key, 20, "%16lx", (unsigned long)distribution(generator));
+      snprintf(value, 20, "%16lx", (unsigned long)distribution(generator));
       batch.Put(key, value);
     }
     s2 = db2->Write(WriteOptions(), &batch);
