@@ -40,21 +40,23 @@ Status s = DB::Open(options, kDBPath, &db);
 
 # Performance Test
 ## Compile
-Check this [link](https://github.com/facebook/rocksdb/blob/main/INSTALL.md) to install the dependencies of RocksDB. Then you can compile RADOS-support as a plugin under `rocksdb\`. The configure file used by env_librados_test is `../ceph/src/ceph.conf`. For Ubuntu 14.04, just run following commands:
+Check this [link](https://github.com/facebook/rocksdb/blob/main/INSTALL.md) to install the dependencies of RocksDB. Then you can compile it by running `$ make env_librados_test ROCKSDB_USE_LIBRADOS=1` under `rocksdb\`. The configure file used by env_librados_test is `../ceph/src/ceph.conf`. For Ubuntu 14.04, just run following commands:
 ```bash
 $ sudo apt-get install libgflags-dev
 $ sudo apt-get install libsnappy-dev
 $ sudo apt-get install zlib1g-dev
 $ sudo apt-get install libbz2-dev
-$ # Use g++ as an example
-$ # In your RocksDB main repo
-$ pushd ./plugin
-$ git clone https://github.com/riversand963/rocksdb-rados-env.git rados
-$ popd
-$ ROCKSDB_PLUGINS="rados" make -j64 static_lib
-$ pushd ./plugin/rados
-$ g++ -I../../include/ -I. -lgtest -pthread -lrados -ldl -lz -lzstd env_librados_test.cc ../../librocksdb.a -o env_librados_test
+$ make env_librados_test ROCKSDB_USE_LIBRADOS=1
 ```
+
+## Test Result
+My test environment is Ubuntu 14.04 in VirtualBox with 8 cores and 8G RAM. Following is the test result.
+
+1. Write (1<<20) keys in random order. The time of writing under default env is around 10s while the time of writing under EnvLibrados is varying from 10s to 30s.
+
+2. Write (1<<20) keys in sequential order. The time of writing under default env drops to arround 1s. But the time of writing under EnvLibrados is not changed. 
+
+3. Read (1<<16) keys from (1<<20) keys in random order. The time of reading under both Envs are roughly the same, around 1.8s.
 
 # MyRocks Test
 ## Compile Ceph
