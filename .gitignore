@@ -32,3 +32,4 @@
 *.app
 
 clang-format-diff.py
+env_librados_test
